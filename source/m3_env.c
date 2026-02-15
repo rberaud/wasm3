@@ -15,17 +15,6 @@
 
 IM3Environment m3_NewEnvironment()
 {
-    // DEBUG: Write to file to verify this code is being executed
-    FILE *debug_file = fopen("C:\\wasm3_debug.txt", "a");
-    if (debug_file)
-    {
-        fprintf(debug_file, "m3_NewEnvironment called!\n");
-        fflush(debug_file);
-        fclose(debug_file);
-    }
-    fprintf(stderr, "DEBUG: m3_NewEnvironment called!\n");
-    fflush(stderr);
-
     IM3Environment env = m3_AllocStruct(M3Environment);
 
     if (env)

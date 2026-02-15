@@ -565,9 +565,6 @@ d_m3Op(Call)
     i32 stackOffset = immediate(i32);
     IM3Memory memory = m3MemInfo(_mem);
 
-    fprintf(stderr, "DEBUG: op_Call executing, callPC=%p, stackOffset=%d\n", callPC, stackOffset);
-    fflush(stderr);
-
     m3stack_t sp = _sp + stackOffset;
 
 #if (d_m3EnableOpProfiling || d_m3EnableOpTracing)
@@ -648,9 +645,6 @@ d_m3Op(CallIndirect)
 d_m3Op(CallRawFunction)
 {
     d_m3TracePrepare
-
-        fprintf(stderr, "DEBUG: CallRawFunction executing\n");
-    fflush(stderr);
 
     M3ImportContext ctx;
 
@@ -945,38 +939,22 @@ d_m3Op(Compile)
 
     if (not result)
     {
-        // Check if this is an imported function
+        // BUGFIX: For imported functions that are already compiled, skip bytecode rewriting.
+        // The function->compiled pointer for imports does NOT point to a mini-program structure
+        // as the original rewriting code assumed. Attempting to rewrite corrupts adjacent bytecode
+        // by writing backwards through the program counter, creating a cascade where each 
+        // subsequent op_Compile reads garbage data from the previous corruption.
+        // The actual host function calls work correctly via op_CallHostInline emitted during
+        // initial compilation, so this op_Compile is redundant for imports.
         if (function->import.moduleUtf8 && function->import.fieldUtf8 && function->compiled)
         {
-            // This is an imported function - rewrite to op_CallHostInline
-            fprintf(stderr, "DEBUG: op_Compile rewriting to op_CallHostInline for %s.%s\n",
-                    function->import.moduleUtf8, function->import.fieldUtf8);
-            fflush(stderr);
-
-            rewrite_op(op_CallHostInline);
-
-            // Extract from mini-program: [op_CallRawFunction, callback, metadata, userdata, op_Return]
-            pc_t miniProgram = (pc_t)function->compiled;
-            M3RawCall callback = (M3RawCall)miniProgram[1];
-            void *userdata = (void *)miniProgram[3];
-
-            // Patch up the parameters
-            _pc -= 2; // Go back to start of op
-            _pc++;    // Skip over rewritten opcode
-            *((M3RawCall *)_pc++) = callback;
-            *((IM3Function *)_pc++) = function;
-            *((void **)_pc++) = userdata;
-            // Stack offset is already there
-
-            // Now jump back and execute the rewritten op_CallHostInline
-            _pc -= 4; // Back to start of rewritten instruction
-            nextOpDirect();
+            // Skip the stack offset parameter that follows op_Compile, then continue execution
+            immediate(u32);
+            nextOp();
         }
         else
         {
             // Regular function - rewrite to op_Call
-            fprintf(stderr, "DEBUG: op_Compile rewriting to op_Call\n");
-            fflush(stderr);
             rewrite_op(op_Call);
 
             // patch up compiled pc and call rewritten op_Call

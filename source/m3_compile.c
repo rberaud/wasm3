@@ -1668,17 +1668,12 @@ _catch:
 
 static M3Result Compile_Call(IM3Compilation o, m3opcode_t i_opcode)
 {
-    fprintf(stderr, "DEBUG: Compile_Call entered\n");
-    fflush(stderr);
     _try
     {
         u32 functionIndex;
         _(ReadLEB_u32(&functionIndex, &o->wasm, o->wasmEnd));
 
         IM3Function function = Module_GetFunction(o->module, functionIndex);
-
-        fprintf(stderr, "DEBUG: Compile_Call - function index=%d, function=%p\n", functionIndex, function);
-        fflush(stderr);
 
         if (function)
         {
@@ -1705,10 +1700,6 @@ static M3Result Compile_Call(IM3Compilation o, m3opcode_t i_opcode)
                         M3RawCall callback = (M3RawCall)miniProgram[1];
                         void *userdata = (void *)miniProgram[3];
 
-                        fprintf(stderr, "DEBUG: Emitting op_CallHostInline for linked import %s.%s\n",
-                                function->import.moduleUtf8, function->import.fieldUtf8);
-                        fflush(stderr);
-
                         _(EmitOp(o, op_CallHostInline));
                         EmitPointer(o, callback);
                         EmitPointer(o, function);
@@ -1718,10 +1709,6 @@ static M3Result Compile_Call(IM3Compilation o, m3opcode_t i_opcode)
                     else
                     {
                         // Not yet linked - emit op_Compile which will handle it later
-                        fprintf(stderr, "DEBUG: Import %s.%s not yet linked, using op_Compile\n",
-                                function->import.moduleUtf8, function->import.fieldUtf8);
-                        fflush(stderr);
-
                         _(EmitOp(o, op_Compile));
                         EmitPointer(o, function);
                         EmitSlotOffset(o, slotTop);
@@ -1730,9 +1717,6 @@ static M3Result Compile_Call(IM3Compilation o, m3opcode_t i_opcode)
                 else if (function->compiled)
                 {
                     // Regular WASM function that's compiled
-                    fprintf(stderr, "DEBUG: Using op_Call for compiled function\n");
-                    fflush(stderr);
-
                     _(EmitOp(o, op_Call));
                     EmitPointer(o, function->compiled);
                     EmitSlotOffset(o, slotTop);
@@ -1740,9 +1724,6 @@ static M3Result Compile_Call(IM3Compilation o, m3opcode_t i_opcode)
                 else
                 {
                     // WASM function not yet compiled
-                    fprintf(stderr, "DEBUG: Using op_Compile for  uncompiled function\n");
-                    fflush(stderr);
-
                     _(EmitOp(o, op_Compile));
                     EmitPointer(o, function);
                     EmitSlotOffset(o, slotTop);
@@ -2925,12 +2906,6 @@ M3Result CompileFunction(IM3Function io_function)
 {
     if (!io_function->wasm)
         return "function body is missing";
-
-    fprintf(stderr, "DEBUG: CompileFunction called for function '%s' (import: %s.%s)\n",
-            m3_GetFunctionName(io_function),
-            io_function->import.moduleUtf8 ? io_function->import.moduleUtf8 : "NULL",
-            io_function->import.fieldUtf8 ? io_function->import.fieldUtf8 : "NULL");
-    fflush(stderr);
 
     IM3FuncType funcType = io_function->funcType;
     m3log(compile, "compiling: [%d] %s %s; wasm-size: %d",
